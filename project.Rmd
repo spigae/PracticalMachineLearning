@@ -1,0 +1,201 @@
+---
+title: "Practical Machine Learning Course: Prediction Assignment Writeup"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Overview
+
+This is the final report of the Peer Assessment project from Coursera’s course Practical Machine Learning. It has been created employing RStudio, using its knitr functions.
+
+The main goal of the project is to predict the manner in which 6 participants performed some exercise as described below. This is the “classe” variable in the training set. Using the training data, several machine learning algorithms have been tested to identify the best performer in terms of accuracy of the predictions.
+The best performer is applied to the 20 test cases available in the test data and the predictions are submitted in appropriate format to the Course Project Prediction Quiz for automated grading.
+
+# Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from http://groupware.les.inf.puc-rio.br/har. Full source:
+
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. “Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human ’13)”. Stuttgart, Germany: ACM SIGCHI, 2013.
+
+My special thanks to the above mentioned authors for being so generous in allowing their data to be used for this kind of assignment.
+
+# Data loading and cleaning
+
+Loading libraries: 
+```{r}
+library(knitr)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(randomForest)
+library(corrplot)
+```
+
+**a. Loading the data**
+
+The following lines permit to download the files containing the training and the testing sets:
+```{r}
+train0 <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"),header=TRUE)
+test0 <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"),header=TRUE)
+```
+
+I will now make a preliminary analysis of both the train and test set to understand if there are missing entries or features that need a special treatment.
+
+For the training set this is the outcome:
+```{r}
+dim(train0)
+str(train0)
+#summary(train0)
+```
+
+For the testing set this is the outcome:
+```{r}
+dim(test0)
+str(test0)
+#summary(test0)
+```
+
+**b. Cleaning the data**
+
+The preliminary analysis shows there are a lot of features having NA or blanked entries in both the training and testing sets. Due to this, I will now proceed to remove the features having NA and/or missing values. Despite this is the dirtiest strategy, it is, on the other hand, the simplest.
+
+I start with the training set:
+```{r}
+idCol <- which(colSums(is.na(train0) |train0=="") > 0.95*dim(train0)[1])
+train1 <- train0[,-idCol]
+train1 <- train1[,-c(1:7)]
+dim(train1)
+```
+
+Now, I will proceed to do the same with the test set, making sure we are eliminating exactly the same columns:
+```{r}
+test1 <- test0[,-idCol]
+test1 <- test1[,-c(1:7)]
+dim(test1)
+```
+
+The final sets, that will be used for the machine learning runs, have both 53 features.
+
+# Building and Assessing the models 
+
+Five methods will be applied to model the regressions (in the Train dataset) and the best one (with higher accuracy when applied to the Test dataset) will be used for the quiz predictions. 
+
+The methods are: Random Forests (RF), Decision Tree (DT), Generalized Boosted Model (GBM), Linear Discriminant Analysis (LDA) and Support Vector Machines (SVM).
+
+It will be used a 5 fold cross validation on the training set to indentify the algorithm with the higher performance in terms of accuracy.
+
+**a. Random Forest (RF)**
+
+Here, I will be testing the algorithm Random Forest.
+
+```{r}
+set.seed(12345)
+cv <- trainControl(method="cv", number=5, verboseIter=FALSE)
+rf <- train(classe ~ ., data=train1, method="rf",
+                          trControl=cv)
+print(rf)
+rf$finalModel
+```
+
+The accuracy obtained by RF is 0.994.
+
+**b. Decision Trees (DT)**
+
+Here, I will be testing the algorithm Decision Trees.
+
+```{r}
+set.seed(12345)
+cv <- trainControl(method="cv", number=5, verboseIter=FALSE)
+dt <- train(classe ~ ., data=train1, method="rpart",
+                          trControl=cv)
+print(dt)
+dt$finalModel
+```
+
+Plotting the tree obtained by the algorithm
+```{r}
+#print(dt)
+fancyRpartPlot(dt$finalModel)
+```
+
+The accuracy obtained by DT is 0.504.
+
+**c. Generalized Boosted Model (GBM)**
+
+Here, I will be testing the algorithm Generalized Boosted Model.
+
+```{r}
+set.seed(12345)
+cv <- trainControl(method="cv", number=5, verboseIter=FALSE)
+gbm <- train(classe ~ ., data=train1, method="gbm",
+                          trControl=cv, verbose=FALSE)
+print(gbm)
+gbm$finalModel
+```
+
+Plotting the accuracy as a function of the boosting interaction and the maximum tree dept:
+```{r}
+plot(gbm)
+```
+
+The accuracy obtained by GBM is 0.962.
+
+**d. Linear Discriminant Analysis (LDA)**
+
+Here, I will be testing the algorithm Linear Discriminant Analysis.
+
+```{r}
+set.seed(12345)
+cv <- trainControl(method="cv", number=5, verboseIter=FALSE)
+lda <- train(classe ~ ., data=train1, method="lda", trControl=cv)
+print(lda)
+lda$finalModel
+```
+
+The accuracy obtained by LDA is 0.703.
+
+**d. Support Vector Machines (SVM)**
+
+Here, I will be testing the algorithm Support Vector Machines.
+
+```{r}
+set.seed(12345)
+cv <- trainControl(method="cv", number=5, verboseIter=FALSE)
+svm <- train(classe ~ ., data=train1, method = "svmLinear",
+                    preProc = c("center","scale"), trControl=cv)
+print(svm)
+svm$finalModel
+```
+
+The accuracy obtained by SVM is 0.786.
+
+# Predictions
+
+The accuracies of the 5 employed algorithms are:
+
+a. Random Forest: 0.994
+b. Decision Tree: 0.504
+c. Generalized Boosted Model: 0.962
+d. Linear Discriminant Analysis: 0.703
+e. Support Vector Machines: 0.786
+
+Being the algorithm Random Forest producing the most accurate model, I will apply it to predict the 20 quiz results from the test dataset.
+
+```{r}
+predictionsRF <- predict(rf, newdata=test1)
+predictionsRF
+```
